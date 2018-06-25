@@ -252,7 +252,6 @@ int main (int argc, char ** argv) {
 		double d = pow(2, bit);
 		int waitingFrom = rank - d;
 		int arraySize;
-		//int arrayBSize;
 		MPI_Recv(&arraySize, 1, MPI_INT, waitingFrom, MPI_ANY_TAG, MPI_COMM_WORLD, &st); // Recebe primeiro o size
 		if(size > 0) { // Se o size == 0 significa que o programa já acabou
 			int* arrayCopy = malloc(arraySize * sizeof(int));

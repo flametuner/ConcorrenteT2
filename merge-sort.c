@@ -28,7 +28,7 @@ int rank;
 int power = 0;
 int maxDivisions = 0;
 int divisions = 0;
-int *ordenado;
+
 /*
  * More info on: http://en.cppreference.com/w/c/language/variadic
  */
@@ -45,26 +45,33 @@ void debug(const char* msg, ...) {
  * Orderly merges two int arrays (numbers[begin..middle] and numbers[middle..end]) into one (sorted).
  * \retval: merged array -> sorted
  */
- void merge(int* numbers, int begin, int middle, int end, int * tmp, int * sorted) {
+ void merge(int* numbers1, int* numbers2, int begin1, int end1, int begin2, int end2, int beginSorted, int endSorted, int * tmp, int * sorted) {
 	int i, j;
-	i = begin; j = middle;
-	debug("Merging. Begin: %d, Middle: %d, End: %d\n", begin, middle, end);
-	for (int k = begin; k < end; ++k) {
-		debug("LHS[%d]: %d, RHS[%d]: %d\n", i, numbers[i], j, numbers[j]);
-		if (i < middle && (j >= end || numbers[i] < numbers[j])) {
-			tmp[k] = numbers[i];
-			//printf("Merge Rank %d\n", rank);
+	i = begin1; j = begin2;
+	//debug("Merging. Begin: %d, Middle: %d, End: %d\n", begin, middle, end);
+	for (int k = beginSorted; k < endSorted; ++k) {
+		debug("LHS[%d]: %d, RHS[%d]: %d\n", i, numbers1[i], j, numbers2[j]);
+		if (i < end1 && (j >= end2 || numbers1[i] < numbers2[j])) {
+			tmp[k] = numbers1[i];
+			//printf("Merge2 Rank %d\n", rank);
 			i++;
 		} else {
-			tmp[k] = numbers[j];
+			tmp[k] = numbers2[j];
 			j++;
 		}
 	}
 
-	for(int i = begin; i < end; i++) {
+	for(int i = beginSorted; i < endSorted; i++) {
 		sorted[i] = tmp[i];
 	}
+}
 
+void print_array(int* array, int size) {
+	printf("Printing Array:\n");
+	for (int i = 0; i < size; ++i) {
+		printf("%d. ", array[i]);
+	}
+	printf("\n");
 }
 
 /*
@@ -79,17 +86,14 @@ void recursive_merge_sort(int* numbers, int begin, int end, int* tmp) {
 		int arraySize = middle - begin;
 
 		int* copy = malloc(sizeof(int) * arraySize);
+		memcpy(copy, numbers + begin, arraySize * sizeof(int)); // Faz uma copia do array para copy
 
 		int to = rank + pow(2, power++);
 	  int receive = 0;
-	  if(divisions < maxDivisions) {
-
-			for(int i = 0; i < arraySize; i++) {
-				copy[i] = numbers[begin + i];
-			}
+	  if(divisions < maxDivisions) { // Se puder se dividir em mais processos
 
 	    MPI_Send(&arraySize, 1, MPI_INT, to, 0, MPI_COMM_WORLD);
-			MPI_Send(copy, arraySize, MPI_INT, to, 0, MPI_COMM_WORLD);
+			MPI_Send(copy, arraySize, MPI_INT, to, 0, MPI_COMM_WORLD); // Envia a copia do array
 	    receive = 1;
 	    divisions++;
 	  }
@@ -97,30 +101,21 @@ void recursive_merge_sort(int* numbers, int begin, int end, int* tmp) {
 		recursive_merge_sort(numbers, middle, end, tmp);
 		if(receive) {
 			MPI_Status st;
-			MPI_Recv(copy, arraySize, MPI_INT, to, MPI_ANY_TAG, MPI_COMM_WORLD, &st); // Recebe o array ordenado
-			for(int i = 0; i < arraySize; i++) {
-				 numbers[begin + i] = copy[i];
-			}
+			MPI_Recv(copy, arraySize, MPI_INT, to, MPI_ANY_TAG, MPI_COMM_WORLD, &st); // Recebe o array ordenado do outro processo
 		} else {
-			recursive_merge_sort(numbers, begin, middle, tmp);
+			recursive_merge_sort(copy, 0, arraySize, tmp); // Tem que usar o mesmo processo pra calcular
 		}
-		merge(numbers, begin, middle, end, tmp, numbers);
+		merge(numbers, copy, middle, end, 0, arraySize, begin, end, tmp, numbers); // Ordena o numbers e copy em um array só e o destino é numbers
 		free(copy);
 	}
-}
-
-void print_array(int* array, int size) {
-	printf("Printing Array:\n");
-	for (int i = 0; i < size; ++i) {
-		printf("%d. ", array[i]);
-	}
-	printf("\n");
 }
 
 // First Merge Sort call
 void merge_sort(int * numbers, int size, int * tmp) {
 	recursive_merge_sort(numbers, 0, size, tmp);
 }
+
+
 
 void populate_array(int* array, int size, int max) {
 	int m = max+1;
@@ -161,43 +156,29 @@ int main (int argc, char ** argv) {
 
 	if (rank == 0) {
 		int seed, max_val;
-		int * sortableA;
-		int * tmpA;
-		int * sortableB;
-		int * tmpB;
-		int * sortableC;
-		int * tmpC;
-		size_t arr_sizeA;
-		size_t arr_sizeB;
-		size_t arr_sizeC = arr_sizeA+arr_sizeB;
+		int * sortable;
+		int * tmp;
+		size_t arr_size;
 
 		switch (argc) {
 			case 1:
 				seed = time(NULL);
-				arr_sizeA = NELEMENTS;
-				arr_sizeB = NELEMENTS;
-				arr_sizeC = 2*NELEMENTS;
+				arr_size = NELEMENTS;
 				max_val = MAXVAL;
 				break;
 			case 2:
 				seed = atoi(argv[1]);
-				arr_sizeB = NELEMENTS;
-				arr_sizeA = NELEMENTS;
-				arr_sizeC = 2*NELEMENTS;
+				arr_size = NELEMENTS;
 				max_val = MAXVAL;
 				break;
 			case 3:
 				seed = atoi(argv[1]);
-				arr_sizeA = atoi(argv[2]);
-				arr_sizeB = atoi(argv[2]);
-				arr_sizeC = 2*atoi(argv[2]);
+				arr_size = atoi(argv[2]);
 				max_val = MAXVAL;
 				break;
 			case 4:
 				seed = atoi(argv[1]);
-				arr_sizeA = atoi(argv[2]);
-				arr_sizeB = atoi(argv[2]);
-				arr_sizeC = 2*atoi(argv[2]);
+				arr_size = atoi(argv[2]);
 				max_val = atoi(argv[3]);
 				break;
 			default:
@@ -206,46 +187,18 @@ int main (int argc, char ** argv) {
 		}
 
 		srand(seed);
-		sortableA = malloc(arr_sizeA*sizeof(int));
-		tmpA 	 = malloc(arr_sizeA*sizeof(int));
+		sortable = malloc(arr_size*sizeof(int));
+		tmp 	 = malloc(arr_size*sizeof(int));
 
-		sortableB = malloc(arr_sizeB*sizeof(int));
-		tmpB 	 = malloc(arr_sizeB*sizeof(int));
+		populate_array(sortable, arr_size, max_val);
+		memcpy(tmp, sortable, arr_size*sizeof(int));
 
-		sortableC = malloc(arr_sizeC*sizeof(int));
-		tmpC 	 = malloc(arr_sizeC*sizeof(int));
+		print_array(sortable, arr_size);
+		merge_sort(sortable, arr_size, tmp);
+		print_array(sortable, arr_size);
 
-		populate_array(sortableA, arr_sizeA, max_val);
-		populate_array(sortableB, arr_sizeB, max_val);
-		populate_array(sortableC, arr_sizeC, max_val);
-
-		tmpA = memcpy(tmpA, sortableA, arr_sizeA*sizeof(int));
-		tmpB = memcpy(tmpB, sortableB, arr_sizeB*sizeof(int));
-	  tmpC = memcpy(tmpC, sortableC, arr_sizeC*sizeof(int));
-
-		for (int i = 0; i < arr_sizeA; i++) {
-			sortableC[i] = sortableA[i];
-		}
-		for (int j = arr_sizeA; j < arr_sizeC; j++) {
-			sortableC[j] = sortableB[j-arr_sizeB];
-		}
-		printf("Array A: ");
-		print_array(sortableA, arr_sizeA);
-		printf("Array B: ");
-		print_array(sortableB, arr_sizeB);
-		printf("Uniao dos array: ");
-		print_array(sortableC, arr_sizeC);
-
-		merge_sort(sortableC, arr_sizeC, tmpC);
-		printf("Sorted Array: ");
-		print_array(sortableC, arr_sizeC);
-
-		free(sortableA);
-		free(tmpA);
-		free(sortableB);
-		free(tmpB);
-		free(sortableC);
-		free(tmpC);
+		free(sortable);
+		free(tmp);
 	} else {
 		// Não é rank 0 e ta esperando sua mensagem
 		int bit = 31 - __builtin_clz(rank);

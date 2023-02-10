@@ -134,23 +134,23 @@ int main (int argc, char ** argv) {
 	MPI_Comm_size(MPI_COMM_WORLD, &size);
 
 	int bitSize = 31 - __builtin_clz(size - 1); // Ex: 5 : 0100 (size - 1) = 2
-  int value = ((pow(2, bitSize) * 2) - 1); // Ex 5: 0111 Se cria a mascara
+	int value = ((pow(2, bitSize) * 2) - 1); // Ex 5: 0111 Se cria a mascara
 
-  if(rank > 0) {
-    int bitMax = 31 - __builtin_clz(rank & value);
-    power = (bitMax + 1);
+	if(rank > 0) {
+		int bitMax = 31 - __builtin_clz(rank & value);
+		power = (bitMax + 1);
 
-    maxDivisions = bitSize - bitMax;
-    double lo = log2(size);
-    int loi = lo;
-    if(lo - loi > 0) {
-      if(rank >= size + (value >> 1) - value)
-        maxDivisions -= 1;
-    }
-  } else {
-		if(size > 1)
-    	maxDivisions = bitSize + 1;
-  }
+		maxDivisions = bitSize - bitMax;
+		double lo = log2(size);
+		int loi = lo;
+		if(lo - loi > 0) {
+		if(rank >= size + (value >> 1) - value)
+			maxDivisions -= 1;
+		}
+	} else {
+			if(size > 1)
+			maxDivisions = bitSize + 1;
+	}
 
 	MPI_Barrier(MPI_COMM_WORLD);
 

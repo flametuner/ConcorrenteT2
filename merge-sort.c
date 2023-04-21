@@ -89,14 +89,15 @@ void recursive_merge_sort(int* numbers, int begin, int end, int* tmp) {
 		memcpy(copy, numbers + begin, arraySize * sizeof(int)); // Faz uma copia do array para copy
 
 		int to = rank + pow(2, power++);
-	  int receive = 0;
-	  if(divisions < maxDivisions) { // Se puder se dividir em mais processos
+		int receive = 0;
+		if(divisions < maxDivisions) { // Se puder se dividir em mais processos
 
-	    MPI_Send(&arraySize, 1, MPI_INT, to, 0, MPI_COMM_WORLD);
+			MPI_Send(&arraySize, 1, MPI_INT, to, 0, MPI_COMM_WORLD);
 			MPI_Send(copy, arraySize, MPI_INT, to, 0, MPI_COMM_WORLD); // Envia a copia do array
-	    receive = 1;
-	    divisions++;
-	  }
+			
+			receive = 1;
+			divisions++;
+		}
 		// Deixando rodando metade
 		recursive_merge_sort(numbers, middle, end, tmp);
 		if(receive) {
@@ -143,12 +144,12 @@ int main (int argc, char ** argv) {
 		maxDivisions = bitSize - bitMax;
 		double lo = log2(size);
 		int loi = lo;
-		if(lo - loi > 0) {
-		if(rank >= size + (value >> 1) - value)
-			maxDivisions -= 1;
+		if (lo - loi > 0) {
+			if (rank >= size + (value >> 1) - value)
+				maxDivisions -= 1;
 		}
 	} else {
-			if(size > 1)
+		if (size > 1)
 			maxDivisions = bitSize + 1;
 	}
 
